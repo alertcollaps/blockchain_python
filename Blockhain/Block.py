@@ -1,10 +1,28 @@
 from array import array
 from Crypting import Hash
-from Crypting import KeyPair, verify
+from Crypting import KeyPair, verify, merkle_root
+from datetime import datetime
 class UTXO:
     def __init__(self, address : bytes = None, amount : int = 0) -> None:
         self.address = address
         self.amount = amount
+    
+    def __eq__(self, __value: object) -> bool:
+        try:
+            return self.address == __value.address and self.amount == __value.amount
+        except:
+            return False
+        
+    def __str__(self) -> str:
+        return "--------------\n[address]: %s\n[amount]: %d\n--------------" % (self.address, self.amount)
+
+    def hash(self) -> bytes:
+        from hashlib import sha256
+        return sha256(self.to_bytes()).digest()
+        
+        
+    def to_bytes(self) -> bytes:
+        return self.address + self.amount.to_bytes()
 
         
 
@@ -17,8 +35,20 @@ class Transaction:
         self.sign = sign
         self.pk = pk
     
+    def hashTransaction(self):
+        data:bytes = b''
+        for input in self.inputUTXO:
+            data += input.hash()
+        for output in self.outputUTXO:
+            data += output.hash()
+        
+        data += self.sign.to_bytes() +\
+                self.pk.n.to_bytes() + self.pk.e.to_bytes()
+        
+        return Hash(data)
+
     def checkTransaction(self) -> bool:
-        addr = Hash(self.pk)
+        addr = Hash(self.pk.to_bytes())
         buffer = b''
         inputAmount = 0
         outputAmount = 0
@@ -51,14 +81,40 @@ class BlockBody:
 class Block:
     def __init__(self, height=0, prev=b'', body=BlockBody()) -> None:
         self.height = height
-        self.time = 0
+        self.time = int(datetime.now().timestamp())
         self.root = b''
         self.prev = prev
         self.nonce = 0
         self.hash = b''
         self.body = body
+        
     
     def addTransaction(self, tx : Transaction):
         self.body.tx.append(tx)
+    
+    def setTime(self):
+        self.time = int(datetime.now().timestamp())
+    
+    
+    def getMerkleRoot(self): # Рассчитать корень дерева Меркла. Удобно
+        listHashes:list[bytes] = []
+        for tx in self.body.tx:
+            listHashes.append(tx.hashTransaction())
+        return merkle_root(listHashes)
+    
+    def hashBlock(self)-> bytes:
+        self.root = self.getMerkleRoot()
         
+        data =  self.height.to_bytes() + \
+                self.time.to_bytes() + \
+                self.root + \
+                self.prev + \
+                self.nonce
+                    
+        #self.hash = Hash(data)            # Лучше вручную устанавливать новый хеш
+        return Hash(data)  
+        
+    
+    
+            
     
