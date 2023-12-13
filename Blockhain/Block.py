@@ -47,17 +47,15 @@ class Transaction:
         
         return Hash(data)
 
-    def checkTransaction(self) -> bool:
-        addr = Hash(self.pk.to_bytes())
-        buffer = b''
+    
+    def checkSignature(self) -> bool:
         inputAmount = 0
         outputAmount = 0
+        buffer = b''
         for input in self.inputUTXO:
-            if (input.address != addr): # Если отправитель в инпуте написал другого участника - блокируем
-                return False
             buffer += input.address + input.amount.to_bytes()
             inputAmount += input.amount
-        
+            
         for output in self.outputUTXO:
             buffer += output.address + output.amount.to_bytes()
             outputAmount += output.amount
@@ -65,10 +63,17 @@ class Transaction:
         if inputAmount != outputAmount: # Если значения входов и выходов не совпали - блокируем
             return False
         
-        if verify(buffer, self.sign, self.pk): # Если подпись не подошла - блокируем
-            return False
+        return verify(buffer, self.sign, self.pk) # Если подпись не подошла - блокируем
         
-        return True
+        
+    def checkTransaction(self) -> bool:
+        addr = Hash(self.pk.to_bytes())
+        
+        for input in self.inputUTXO:
+            if (input.address != addr): # Если отправитель в инпуте написал другого участника - блокируем
+                return False
+            
+        return self.checkSignature()
 
 class BlockBody:
     def __init__(self, coinbase=1000000, tx:list[Transaction] = []) -> None:

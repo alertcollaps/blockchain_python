@@ -120,7 +120,7 @@ class Node:
         if (tx0.inputUTXO != inputUTXO or tx0.outputUTXO != outputUTXO): # Проверка, что транзакция соответствует 5 рускоинам
             raise RuntimeError("Miner first transaction failed")
         
-        if not tx0.checkTransaction(): # Проверка самой транзакции
+        if not tx0.checkSignature(): # Проверка подписи самой транзакции
             raise RuntimeError("Failed check first transaction")
         
         genBlock.addTransaction(tx0)
