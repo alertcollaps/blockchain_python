@@ -14,7 +14,7 @@ class UTXO:
             return False
         
     def __str__(self) -> str:
-        return "--------------\n[address]: %s\n[amount]: %d\n--------------" % (self.address, self.amount)
+        return "--------------\n[address]: %s\n[amount]: %d\n--------------" % (self.address.hex(), self.amount)
 
     def hash(self) -> bytes:
         from hashlib import sha256
@@ -68,12 +68,22 @@ class Transaction:
         
     def checkTransaction(self) -> bool:
         addr = Hash(self.pk.to_bytes())
-        
+        buffer = b''
+        inputAmount = 0
+        outputAmount = 0
         for input in self.inputUTXO:
             if (input.address != addr): # Если отправитель в инпуте написал другого участника - блокируем
                 return False
+        
+        for output in self.outputUTXO:
+            buffer += output.address + output.amount.to_bytes()
+            outputAmount += output.amount
             
-        return self.checkSignature()
+        if inputAmount != outputAmount: # Если значения входов и выходов не совпали - блокируем
+            return False
+        
+        return verify(buffer, self.sign, self.pk) # Если подпись не подошла - блокируем
+       
 
 class BlockBody:
     def __init__(self, coinbase=1000000, tx:list[Transaction] = []) -> None:

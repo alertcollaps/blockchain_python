@@ -71,6 +71,12 @@ class Node:
     def getFinalBlock(self, block : Block):
         if not self.checkBlock(block):
             raise RuntimeError("Error check block. Exit.")
+        self.lastBlocks.append(block)
+        
+        self.currentBlock = Block()
+        self.currentBlock.height = block.height + 1
+        self.currentBlock.prev = block.hash
+        self.currentBlock.body.coinbase = block.body.coinbase - 5
         
         
     
@@ -106,8 +112,45 @@ class Node:
             node.getTransactionFromNode(tx)
         
     def resendBlock(self, block : Block):
+        for node in self.nodePool:
+            node.getFinalBlock(block)
         
-        pass
+    def finalyzeBlock(self): # этот метод мы будем трогать HAND
+        coinbaseBalance = self.getCoinbaseBalance()
+        inputUTXO:list[UTXO] = [UTXO(b'Coinbase', coinbaseBalance)]
+        outputUTXO:list[UTXO] = [UTXO(self.addr, 5), UTXO(b'Coinbase', coinbaseBalance-5)]
+        
+        tx0:Transaction = self.miner.getTransaction() # Та самая нулевая транзакция
+        if (tx0.inputUTXO != inputUTXO or tx0.outputUTXO != outputUTXO): # Проверка, что транзакция соответствует 5 рускоинам
+            raise RuntimeError("Miner first transaction failed")
+        
+        if not tx0.checkSignature(): # Проверка подписи самой транзакции
+            raise RuntimeError("Failed check first transaction")
+        
+        self.currentBlock.body.tx.insert(tx0) # Первая транзакция - это выплата майнеру, поэтому инсерт
+        
+        genBlock = self.currentBlock
+        
+        nonce = self.miner.mine(genBlock, self.difficalty) # Майнер решает задачу
+        
+        genBlock.nonce = nonce
+        
+        hashGenBlock = genBlock.hashBlock()
+        if (self.hashDifficalt >= hashGenBlock): # Если майнер нас обманул - кидаем ошибку
+            raise RuntimeError("Failed mine! Exit.")
+        
+        genBlock.setTime() # Устанавливаем время
+        genBlock.hash = hashGenBlock
+        self.lastBlocks.append(genBlock)
+        
+        self.resendBlock(genBlock)
+        # Подготовка нового блока
+        self.currentBlock = Block()
+        self.currentBlock.height = genBlock.height + 1
+        self.currentBlock.prev = genBlock.hash
+        self.currentBlock.body.coinbase = genBlock.body.coinbase - 5
+        
+        
     
     def createGenesisBlock(self):
         
@@ -137,9 +180,17 @@ class Node:
         genBlock.hash = hashGenBlock
         self.lastBlocks.append(genBlock)
         
+        self.resendBlock(genBlock)
         # Подготовка нового блока
+        self.currentBlock = Block()
         self.currentBlock.height = genBlock.height + 1
         self.currentBlock.prev = genBlock.hash
         self.currentBlock.body.coinbase = genBlock.body.coinbase - 5
+        
+    def getHeightBlock(self, height:int)-> Block:
+        if height >= 0 and height < len(self.lastBlocks):
+            return self.lastBlocks[height]
+        return None
+        
         
         

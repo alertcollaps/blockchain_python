@@ -22,10 +22,10 @@ class UTXO:
     
     
         
-utxo1 = UTXO()
+utxo1 = UTXO(b'')
 utxo2 = UTXO()
 
 lst1 = [UTXO(None), utxo2]
 lst2 = [utxo1, utxo2]
-
-print(lst1 == lst2)
+lst1.remove(UTXO())
+print(utxo1.hash().hex())
