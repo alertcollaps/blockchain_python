@@ -6,6 +6,7 @@ class Client:
     def __init__(self, name:str, node : Node) -> None:
         self.name:str = name
         self.node:Node = node
+        
         key = generateRSAKeyPair()
          
         self.__sk:KeyPair = KeyPair(key.n, 0, key.d) #private
@@ -63,11 +64,90 @@ class Client:
         for utx in utxo:
             balance += utx.amount
 
+        self.UTXO = utxo
+        
         return balance
     
     def __str__(self) -> str:
         return "--------------\n[name]: %s\n[addr]: %s\n--------------" % (self.name, self.addr.hex())
     
-    def windowClient(self):
-        pass
+    def printUTXO(self):
+        i = 0
+        for utxo in self.UTXO:
+            print("%d." % (i), utxo)
+            i += 1
+    
+    def enterTransaction(self):
+        self.printUTXO()
+        bufferUTXO:list[UTXO] = []
+    
+        chooseUTXO:str = input("Select transactions{1, 2, 3 ..etc.}:")
+        indexes = chooseUTXO.split(' ')
+        amountChoose = 0
+        dataSign = b''
+        for index in indexes:
+            bufferUTXO.append(self.UTXO[int(index)])
+            amountChoose += self.UTXO[int(index)].amount
+            dataSign += self.UTXO[int(index)].hash()
+            
+        addressDST = input("Enter address dest:")
+        
+        addr = bytes.fromhex(addressDST)
+        
+        amount = int(input("Enter address dest:"))
+        if (amount < amountChoose):
+            print("Warning! Вы ввели слишком большую сумму. Возврат...")
+            return
+        
+        outputUTXO:list[UTXO] = [UTXO(addr, amountChoose)]
+        dataSign += outputUTXO[0].hash()
+        if (amount > amountChoose):
+            outputUTXO.append(self.addr, amount - amountChoose)
+            dataSign += outputUTXO[1].hash()
+        
+        signTX = sign(dataSign, self.__sk)
+        tx = Transaction(bufferUTXO, outputUTXO, signTX, self.pk)
+        print("Result sending transaction:", self.node.addTransaction(tx))
+        
+    
+    def windowsClientTransaction(self):
+        while True:
+            print(self, "Меню транзакций\n\
+            1. Выполнить транзакцию\n\
+            2. Вывести имеющиеся UTXO\n\
+            3. Вернуться назад\n")
+            choose = int(input())
+            if choose == 1:
+                self.enterTransaction()
+                continue
+            elif choose == 2:
+                self.printUTXO()
+                continue
+            elif choose == 3:
+                return
+            
+            print("Вы ввели некорректное значение")
+            
+            
+        
+        
+    
+    def windowClientMain(self):
+        while (True):
+            
+            print(self, "Меню клиента:\n\
+                1. Проверить баланс\n\
+                2. Операции с транзакциями\n\
+                3. Выход\n")
+            
+            choose = int(input())
+            if choose == 1:
+                print("Balance: %d" % (self.calcBalance()))
+                continue
+            elif choose == 2:
+                self.windowsClientTransaction()
+                continue
+            elif choose == 3:
+                return
+        
         #TODO Сделать окна для клинта и ноды со свич кейзами
