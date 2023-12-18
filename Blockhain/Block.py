@@ -22,7 +22,7 @@ class UTXO:
         
         
     def to_bytes(self) -> bytes:
-        return self.address + self.amount.to_bytes()
+        return self.address + self.amount.to_bytes(self.amount.bit_length()//8 + 1)
 
         
 
@@ -42,8 +42,8 @@ class Transaction:
         for output in self.outputUTXO:
             data += output.hash()
         
-        data += self.sign.to_bytes() +\
-                self.pk.n.to_bytes() + self.pk.e.to_bytes()
+        data += self.sign.to_bytes(self.sign.bit_length()//8+1) +\
+                self.pk.n.to_bytes(self.pk.n.bit_length()//8+1) + self.pk.e.to_bytes(self.pk.e.bit_length()//8+1)
         
         return Hash(data)
 
@@ -53,11 +53,11 @@ class Transaction:
         outputAmount = 0
         buffer = b''
         for input in self.inputUTXO:
-            buffer += input.address + input.amount.to_bytes()
+            buffer += input.hash()
             inputAmount += input.amount
             
         for output in self.outputUTXO:
-            buffer += output.address + output.amount.to_bytes()
+            buffer += output.hash()
             outputAmount += output.amount
             
         if inputAmount != outputAmount: # Если значения входов и выходов не совпали - блокируем
@@ -120,16 +120,18 @@ class Block:
     def hashBlock(self)-> bytes:
         self.root = self.getMerkleRoot()
         
-        data =  self.height.to_bytes() + \
-                self.time.to_bytes() + \
+        data =  self.height.to_bytes(self.height.bit_length()//8+1) + \
+                self.time.to_bytes(self.time.bit_length()//8+1) + \
                 self.root + \
                 self.prev + \
-                self.nonce
+                self.nonce.to_bytes(self.nonce.bit_length()//8+1)
                     
         #self.hash = Hash(data)            # Лучше вручную устанавливать новый хеш
         return Hash(data)  
         
     
-    
+    def __str__(self) -> str:
+        return "--------------\n[height]: %d\n[time]: %d\n[root]: %s\n[prev]: %s\n[nonce]: %d\n[hash]: %s\n--------------" % \
+            (self.height, self.time, self.root.hex(), self.prev.hex(), self.nonce, self.hash.hex())
             
     

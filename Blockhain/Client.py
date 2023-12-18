@@ -1,11 +1,11 @@
 from Block import Block, UTXO, Transaction
-from Node import Node
 from Crypting import KeyPair, generateRSAKeyPair, sign, Hash
 from random import randint
+
 class Client:
-    def __init__(self, name:str, node : Node) -> None:
+    def __init__(self, name:str) -> None:
         self.name:str = name
-        self.node:Node = node
+        
         
         key = generateRSAKeyPair()
          
@@ -14,23 +14,21 @@ class Client:
         self.addr:bytes = self.pk.hash()
         self.UTXO:list[UTXO] = []
         self.balance:int = 0
-        coinbaseBalance = self.node.getCoinbaseBalance()
-        inputUTXO:list[UTXO] = [UTXO(b'Coinbase', coinbaseBalance)]
-        outputUTXO:list[UTXO] = [UTXO(self.addr, 5), UTXO(b'Coinbase', coinbaseBalance-5)]
-        sg = sign(inputUTXO[0].hash() + outputUTXO[0].hash() + outputUTXO[1].hash())
-        self.transaction:Transaction = Transaction(inputUTXO, outputUTXO, sg, self.pk)
+     
+    def setNode(self, node):
+        self.node = node
         
     def mine(self, block:Block, difficalty:int)-> int:
-        data =  block.height.to_bytes() + \
-                block.time.to_bytes() + \
+        data =  block.height.to_bytes(block.height.bit_length()//8+1) + \
+                block.time.to_bytes(block.time.bit_length()//8+1) + \
                 block.root + \
                 block.prev
         
-        hashDifficalt = int.to_bytes((2 ** 256) // difficalty, 32, byteorder='big') # 2^256 / diff
+        hashDifficalt = int.to_bytes((2 ** (255)//difficalty), 32, byteorder='big') # 2^256 / diff
                  
         while True:
             nonce:int = randint(0, 2 ** 32)
-            hashVal = Hash(data + nonce)
+            hashVal = Hash(data + nonce.to_bytes(nonce.bit_length()//8+1))
             if hashVal < hashDifficalt:
                 return nonce
     
@@ -38,7 +36,7 @@ class Client:
         coinbaseBalance = self.node.getCoinbaseBalance()
         inputUTXO:list[UTXO] = [UTXO(b'Coinbase', coinbaseBalance)]
         outputUTXO:list[UTXO] = [UTXO(self.addr, 5), UTXO(b'Coinbase', coinbaseBalance-5)]
-        sg = sign(inputUTXO[0].hash() + outputUTXO[0].hash() + outputUTXO[1].hash())
+        sg = sign(inputUTXO[0].hash() + outputUTXO[0].hash() + outputUTXO[1].hash(), self.__sk)
         self.transaction:Transaction = Transaction(inputUTXO, outputUTXO, sg, self.pk)
         return Transaction(inputUTXO, outputUTXO, sg, self.pk)
     
@@ -51,6 +49,7 @@ class Client:
         utxo:list[UTXO] = []
         while True:
             block:Block = self.getBlock(height)
+            height += 1
             if block == None:
                 break
             for tx in block.body.tx:
@@ -151,3 +150,4 @@ class Client:
                 return
         
         #TODO Сделать окна для клинта и ноды со свич кейзами
+    

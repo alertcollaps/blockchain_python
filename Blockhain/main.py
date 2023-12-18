@@ -15,30 +15,35 @@ class Main:
         # Дружим ноды друг с другом
         node1.nodePool = [node2, node3]
         node2.nodePool = [node1, node3]
-        node3.nodePool = [node2, node3]
+        node3.nodePool = [node1, node2]
 
         # Создаем клиентов - майнеров
-        miner1 = Client("miner1", node1) # Говорим каждому майнеру, к какой ноде он относится
-        miner2 = Client("miner2", node2)
-        miner3 = Client("miner3", node3)
+        miner1 = Client("miner1")
+        miner2 = Client("miner2")
+        miner3 = Client("miner3")
 
         # Создаем клиента
-        client1 = Client("client1", node1)
+        client1 = Client("client1")
+        client1.setNode(node1)
 
         # Говорим каждой ноде, какой у неё майнер
-        node1.miner = miner1
-        node2.miner = miner2
-        node3.miner = miner3
+        node1.setMiner(miner1)
+        node2.setMiner(miner2)
+        node3.setMiner(miner3)
 
+        miner1.setNode(node1)
+        miner2.setNode(node2)
+        miner3.setNode(node3)
+        
 
         self.nodePool = [node1, node2, node3] # Все наши узлы
         self.clientPool = [miner1, miner2, miner3, client1]
         print("0:", node1)
-        print("1:",node2)
-        print("2:",node3)
+        print("1:", node2)
+        print("2:", node3)
 
         # Create genesis block
-        i = random.randint(0, len(self.nodePool)) # Выбор узла
+        i = random.randint(0, len(self.nodePool)-1) # Выбор узла
         print("Выбран узел №%d" % i)
         self.nodePool[i].createGenesisBlock()
 
@@ -81,7 +86,7 @@ class Main:
             print("3. Вернуться назад")
             choose = int(input())
             if choose >= 0 and choose <= 2:
-                self.nodePool[i].windowNodeMain()
+                self.nodePool[choose].windowNodeMain()
                 continue
             elif choose == 3:
                 return
@@ -99,7 +104,7 @@ class Main:
             print("4. Вернуться назад")
             choose = int(input())
             if choose >= 0 and choose <= 3:
-                self.clientPool[i].windowClientMain()
+                self.clientPool[choose].windowClientMain()
                 continue
             elif choose == 4:
                 return
@@ -110,3 +115,6 @@ class Main:
         i = random.randint(0, len(self.nodePool)) # Выбор узла
         print("Выбран узел №%d" % i)
         self.nodePool[i].finalyzeBlock()
+
+start = Main()
+start.main()

@@ -11,7 +11,7 @@ class KeyPair:
                 return Hash(self.to_bytes())
                 
         def to_bytes(self) -> bytes:
-                return self.n.to_bytes(self.n.bit_length()//8) + self.e.to_bytes(self.e.bit_length()//8) + self.d.to_bytes(self.d.bit_length()//8)
+                return self.n.to_bytes(self.n.bit_length()//8) + self.e.to_bytes(self.e.bit_length()//8+1) + self.d.to_bytes(self.d.bit_length()//8)
 
 def generateRSAKeyPair()-> KeyPair:
         keyPair = RSA.generate(bits=1024)

@@ -1,23 +1,27 @@
 from array import array
 from Block import *
-from Crypting import merkle_root
+from Crypting import merkle_root, generateRSAKeyPair, sign, Hash
+
 from Client import Client
 class Node:
-    def __init__(self, miner : Client, nodePool:list, lastBlocks:list[Block] = [], UTXO:list[UTXO]=[UTXO(b'Coinbase', Block().body.coinbase)]) -> None:
-        self.nodePool:list[Node] = nodePool
-        self.lastBlocks = lastBlocks
+    def __init__(self) -> None:
+        self.nodePool:list[Node] = []
+        self.lastBlocks = []
         self.currentBlock = Block()
-        self.UTXO = UTXO
-        self.miner = miner
+        self.UTXO = [UTXO(b'Coinbase', Block().body.coinbase)]
+        
         self.difficalty = 2 ** 2
-        self.hashDifficalt = int.to_bytes((2 ** 256) // self.difficalty, 32, byteorder='big') # 2^256 / diff
+        self.hashDifficalt = int.to_bytes((2 ** (255)//self.difficalty), 32, byteorder='big') # 2^256 / diff
 
+    
+    def setMiner(self, miner: Client):
+        self.miner:Client = miner
     def checkBlock(self, block : Block) -> bool:
         hashMerkle = block.getMerkleRoot() # 1. Расчет дерева Меркла
         if (hashMerkle != block.root):     # и проверка
             return False
         
-        if (self.hashDifficalt >= block.hash): # 2. Если hash больше
+        if (self.hashDifficalt < block.hash): # 2. Если hash больше
             return False
         if (block.hash != block.hashBlock()): # 2. Если хеш не совпадает
             return False
@@ -45,8 +49,11 @@ class Node:
         if block.height != (numberBlock+1): # 3. Если порядок следования не совпадает
             return False
 
-    
+        i = 0
         for tx in block.body.tx: # 8. Проверка транзакций
+            if i == 0: # Пропускаем 0-ую транзакцию, она была проверена ранее
+                i = 1
+                continue
             if not tx.checkTransaction():
                 return False
         
@@ -61,7 +68,7 @@ class Node:
                     if (input == selfUTXO):
                         self.UTXO.remove(selfUTXO)
                         break
-                raise RuntimeError("Failed find input UTXO in checkBlock")
+                #raise RuntimeError("Failed find input UTXO in checkBlock")
         
         return True
         
@@ -126,20 +133,29 @@ class Node:
         
         if not tx0.checkSignature(): # Проверка подписи самой транзакции
             raise RuntimeError("Failed check first transaction")
-        
+        bufferUTXO:list[UTXO] = []
+        for txs in  self.currentBlock.body.tx:
+            for output in txs.outputUTXO:
+                bufferUTXO.append(output)
+            for input in txs.inputUTXO:
+                for selfUTXO in bufferUTXO:
+                    if selfUTXO == input:
+                        bufferUTXO.remove(input)
+                        break
         self.currentBlock.body.tx.insert(tx0) # Первая транзакция - это выплата майнеру, поэтому инсерт
         
         genBlock = self.currentBlock
-        
+        genBlock.root = genBlock.getMerkleRoot()
+        genBlock.setTime() # Устанавливаем время
         nonce = self.miner.mine(genBlock, self.difficalty) # Майнер решает задачу
-        
+        self.UTXO = bufferUTXO
         genBlock.nonce = nonce
         
         hashGenBlock = genBlock.hashBlock()
         if (self.hashDifficalt >= hashGenBlock): # Если майнер нас обманул - кидаем ошибку
             raise RuntimeError("Failed mine! Exit.")
         
-        genBlock.setTime() # Устанавливаем время
+        
         genBlock.hash = hashGenBlock
         self.lastBlocks.append(genBlock)
         
@@ -157,7 +173,7 @@ class Node:
         genBlock = Block()
         coinbaseBalance = self.getCoinbaseBalance()
         inputUTXO:list[UTXO] = [UTXO(b'Coinbase', coinbaseBalance)]
-        outputUTXO:list[UTXO] = [UTXO(self.addr, 5), UTXO(b'Coinbase', coinbaseBalance-5)]
+        outputUTXO:list[UTXO] = [UTXO(self.miner.addr, 5), UTXO(b'Coinbase', coinbaseBalance-5)]
         
         tx0:Transaction = self.miner.getTransaction() # Та самая нулевая транзакция
         if (tx0.inputUTXO != inputUTXO or tx0.outputUTXO != outputUTXO): # Проверка, что транзакция соответствует 5 рускоинам
@@ -167,20 +183,22 @@ class Node:
             raise RuntimeError("Failed check first transaction")
         
         genBlock.addTransaction(tx0)
-    
+        genBlock.root = genBlock.getMerkleRoot()
+        genBlock.setTime() # Устанавливаем время
         nonce = self.miner.mine(genBlock, self.difficalty) # Майнер решает задачу
         
         genBlock.nonce = nonce
         
         hashGenBlock = genBlock.hashBlock()
-        if (self.hashDifficalt >= hashGenBlock): # Если майнер нас обманул - кидаем ошибку
+        if (self.hashDifficalt <= hashGenBlock): # Если майнер нас обманул - кидаем ошибку
             raise RuntimeError("Failed mine! Exit.")
         
-        genBlock.setTime() # Устанавливаем время
+        
         genBlock.hash = hashGenBlock
         self.lastBlocks.append(genBlock)
         
         self.resendBlock(genBlock)
+        self.UTXO = outputUTXO
         # Подготовка нового блока
         self.currentBlock = Block()
         self.currentBlock.height = genBlock.height + 1
@@ -192,5 +210,28 @@ class Node:
             return self.lastBlocks[height]
         return None
         
+    def printLastBlocks(self):
+        for blocks in self.lastBlocks:
+            print(blocks)
+    
+    def printCurrentUTXO(self):
+        for utxo in self.UTXO:
+            print(utxo)
         
-        
+    def windowNodeMain(self):
+        while True:
+            print(self, "Меню транзакций\n\
+            1. Последние блоки\n\
+            2. Вывести имеющиеся UTXO\n\
+            3. Вернуться назад\n")
+            choose = int(input())
+            if choose == 1:
+                self.printLastBlocks()
+                continue
+            elif choose == 2:
+                self.printCurrentUTXO()
+                continue
+            elif choose == 3:
+                return
+            
+            print("Вы ввели некорректное значение")
