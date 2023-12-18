@@ -10,7 +10,7 @@ class Node:
         self.currentBlock = Block()
         self.UTXO = [UTXO(b'Coinbase', Block().body.coinbase)]
         
-        self.difficalty = 2 ** 2
+        self.difficalty = 2 ** 16
         self.hashDifficalt = int.to_bytes((2 ** (255)//self.difficalty), 32, byteorder='big') # 2^256 / diff
 
     
@@ -30,14 +30,14 @@ class Node:
         if len(self.lastBlocks) != 0: # Если блок уже есть
             if (block.prev != self.lastBlocks[len(self.lastBlocks)-1].hash): # 4. Проверка на предыдущий блок
                 return False
-            if (block.time > self.lastBlocks[len(self.lastBlocks)-1].time): # 5. Проверка времени
+            if (block.time < self.lastBlocks[len(self.lastBlocks)-1].time): # 5. Проверка времени
                 return False
-            if (block.body.coinbase == self.lastBlocks[len(self.lastBlocks)-1].body.coinbase - 5): # 5. Проверка времени
+            if ( block.body.coinbase < 0 or block.body.coinbase != (self.lastBlocks[len(self.lastBlocks)-1].body.coinbase - 5) ): # 6. Проверка времени
                 return False
             
             bufferUTXO:list[UTXO] = [] # В конечном итоге должен равен UTXO ноды
             for txs in self.lastBlocks[len(self.lastBlocks)-1].body.tx: # Текущий UTXO в каждой ноде должен равен 
-                for input in txs.input:
+                for input in txs.inputUTXO:
                     bufferUTXO.append(input)
                 
             
@@ -84,7 +84,7 @@ class Node:
         self.currentBlock.height = block.height + 1
         self.currentBlock.prev = block.hash
         self.currentBlock.body.coinbase = block.body.coinbase - 5
-        
+        pass
         
     
     def getTransactionFromNode(self, tx : Transaction) -> str: # Для узлов
@@ -96,7 +96,7 @@ class Node:
                 if (utxo == inputUTXO):
                     removeUTXO.append(utxo)
                     break
-            return "Can't find all UTXO"
+                return "Can't find all UTXO"
 
         for removeUtxo in removeUTXO: # Если все заявленные отправителем inputUtxo найдены, то удаляем из из пула
             self.UTXO.remove(removeUtxo)
@@ -125,7 +125,7 @@ class Node:
     def finalyzeBlock(self): # этот метод мы будем трогать HAND
         coinbaseBalance = self.getCoinbaseBalance()
         inputUTXO:list[UTXO] = [UTXO(b'Coinbase', coinbaseBalance)]
-        outputUTXO:list[UTXO] = [UTXO(self.addr, 5), UTXO(b'Coinbase', coinbaseBalance-5)]
+        outputUTXO:list[UTXO] = [UTXO(self.miner.addr, 5), UTXO(b'Coinbase', coinbaseBalance-5)]
         
         tx0:Transaction = self.miner.getTransaction() # Та самая нулевая транзакция
         if (tx0.inputUTXO != inputUTXO or tx0.outputUTXO != outputUTXO): # Проверка, что транзакция соответствует 5 рускоинам
@@ -142,7 +142,7 @@ class Node:
                     if selfUTXO == input:
                         bufferUTXO.remove(input)
                         break
-        self.currentBlock.body.tx.insert(tx0) # Первая транзакция - это выплата майнеру, поэтому инсерт
+        self.currentBlock.body.tx.insert(0, tx0) # Первая транзакция - это выплата майнеру, поэтому инсерт
         
         genBlock = self.currentBlock
         genBlock.root = genBlock.getMerkleRoot()
@@ -152,7 +152,7 @@ class Node:
         genBlock.nonce = nonce
         
         hashGenBlock = genBlock.hashBlock()
-        if (self.hashDifficalt >= hashGenBlock): # Если майнер нас обманул - кидаем ошибку
+        if (self.hashDifficalt <= hashGenBlock): # Если майнер нас обманул - кидаем ошибку
             raise RuntimeError("Failed mine! Exit.")
         
         

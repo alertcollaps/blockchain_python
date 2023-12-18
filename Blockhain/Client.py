@@ -80,7 +80,7 @@ class Client:
         self.printUTXO()
         bufferUTXO:list[UTXO] = []
     
-        chooseUTXO:str = input("Select transactions{1, 2, 3 ..etc.}:")
+        chooseUTXO:str = input("Select transactions{1, 2, 3 ..etc.}: ")
         indexes = chooseUTXO.split(' ')
         amountChoose = 0
         dataSign = b''
@@ -89,19 +89,19 @@ class Client:
             amountChoose += self.UTXO[int(index)].amount
             dataSign += self.UTXO[int(index)].hash()
             
-        addressDST = input("Enter address dest:")
+        addressDST = input("Enter address dest: ")
         
         addr = bytes.fromhex(addressDST)
         
-        amount = int(input("Enter address dest:"))
-        if (amount < amountChoose):
+        amount = int(input("Enter amount: "))
+        if (amount > amountChoose):
             print("Warning! Вы ввели слишком большую сумму. Возврат...")
             return
         
-        outputUTXO:list[UTXO] = [UTXO(addr, amountChoose)]
+        outputUTXO:list[UTXO] = [UTXO(addr, amount)]
         dataSign += outputUTXO[0].hash()
-        if (amount > amountChoose):
-            outputUTXO.append(self.addr, amount - amountChoose)
+        if (amount < amountChoose):
+            outputUTXO.append(UTXO(self.addr, amountChoose - amount))
             dataSign += outputUTXO[1].hash()
         
         signTX = sign(dataSign, self.__sk)

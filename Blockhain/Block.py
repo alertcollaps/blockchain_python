@@ -72,11 +72,13 @@ class Transaction:
         inputAmount = 0
         outputAmount = 0
         for input in self.inputUTXO:
+            buffer += input.hash()
+            inputAmount += input.amount
             if (input.address != addr): # Если отправитель в инпуте написал другого участника - блокируем
                 return False
         
         for output in self.outputUTXO:
-            buffer += output.address + output.amount.to_bytes()
+            buffer += output.hash()
             outputAmount += output.amount
             
         if inputAmount != outputAmount: # Если значения входов и выходов не совпали - блокируем
@@ -86,22 +88,22 @@ class Transaction:
        
 
 class BlockBody:
-    def __init__(self, coinbase=1000000, tx:list[Transaction] = []) -> None:
+    def __init__(self, coinbase=1000000) -> None:
         self.coinbase = coinbase
-        self.tx = tx
+        self.tx = []
         
     
         
 
 class Block:
-    def __init__(self, height=0, prev=b'', body=BlockBody()) -> None:
-        self.height = height
+    def __init__(self) -> None:
+        self.height = 0
         self.time = int(datetime.now().timestamp())
         self.root = b''
-        self.prev = prev
+        self.prev = b''
         self.nonce = 0
         self.hash = b''
-        self.body = body
+        self.body = BlockBody()
         
     
     def addTransaction(self, tx : Transaction):

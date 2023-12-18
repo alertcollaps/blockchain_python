@@ -112,7 +112,7 @@ class Main:
             print("Вы ввели некорректное значение")
     
     def startNewBlock(self):
-        i = random.randint(0, len(self.nodePool)) # Выбор узла
+        i = random.randint(0, len(self.nodePool)-1) # Выбор узла
         print("Выбран узел №%d" % i)
         self.nodePool[i].finalyzeBlock()
 
