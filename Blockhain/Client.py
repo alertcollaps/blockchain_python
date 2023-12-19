@@ -106,7 +106,11 @@ class Client:
         
         signTX = sign(dataSign, self.__sk)
         tx = Transaction(bufferUTXO, outputUTXO, signTX, self.pk)
-        print("Result sending transaction:", self.node.addTransaction(tx))
+        try:
+            print("Result sending transaction:", self.node.addTransaction(tx))
+        except:
+            print("Result sending transaction:", "Error sever")
+        
         
     
     def windowsClientTransaction(self):
