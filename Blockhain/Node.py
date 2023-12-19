@@ -56,19 +56,7 @@ class Node:
                 continue
             if not tx.checkTransaction():
                 return False
-        
-        self.UTXO = [] # 10. and 11. Добавляем output и удаляем инпуты
-        for tx in block.body.tx: # Add
-            for output in tx.outputUTXO:
-                self.UTXO.append(output)
-                
-        for tx in block.body.tx: # Remove
-            for input in tx.inputUTXO:
-                for selfUTXO in self.UTXO:
-                    if (input == selfUTXO):
-                        self.UTXO.remove(selfUTXO)
-                        break
-                #raise RuntimeError("Failed find input UTXO in checkBlock")
+       
         
         return True
         
@@ -78,6 +66,18 @@ class Node:
     def getFinalBlock(self, block : Block):
         if not self.checkBlock(block):
             raise RuntimeError("Error check block. Exit.")
+        
+        bufferUTXO:list[UTXO] = []
+        for txs in block.body.tx:
+            for output in txs.outputUTXO:
+                bufferUTXO.append(output)
+            for input in txs.inputUTXO:
+                for selfUTXO in bufferUTXO:
+                    if selfUTXO == input:
+                        bufferUTXO.remove(input)
+                        break
+        
+        self.UTXO = bufferUTXO
         self.lastBlocks.append(block)
         
         self.currentBlock = Block()
@@ -91,11 +91,15 @@ class Node:
         if (not tx.checkTransaction()):
             return "Transacion sign failed"
         removeUTXO:list[UTXO] = [] # Массив UTXO, которые мы удалим
+        check = True
         for inputUTXO in tx.inputUTXO:
             for utxo in self.UTXO:
+                check = True
                 if (utxo == inputUTXO):
                     removeUTXO.append(utxo)
+                    check = False
                     break
+            if check:
                 return "Can't find all UTXO"
 
         for removeUtxo in removeUTXO: # Если все заявленные отправителем inputUtxo найдены, то удаляем из из пула
@@ -134,6 +138,7 @@ class Node:
         if not tx0.checkSignature(): # Проверка подписи самой транзакции
             raise RuntimeError("Failed check first transaction")
         bufferUTXO:list[UTXO] = []
+        self.currentBlock.body.tx.insert(0, tx0) # Первая транзакция - это выплата майнеру, поэтому инсерт
         for txs in  self.currentBlock.body.tx:
             for output in txs.outputUTXO:
                 bufferUTXO.append(output)
@@ -142,7 +147,7 @@ class Node:
                     if selfUTXO == input:
                         bufferUTXO.remove(input)
                         break
-        self.currentBlock.body.tx.insert(0, tx0) # Первая транзакция - это выплата майнеру, поэтому инсерт
+        
         
         genBlock = self.currentBlock
         genBlock.root = genBlock.getMerkleRoot()
